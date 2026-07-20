@@ -1,24 +1,22 @@
 """Configuration settings for FastAPI application."""
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings."""
 
+    model_config = SettingsConfigDict(env_file=".env")
+
     PROJECT_ROOT: Path = Path(__file__).parent.parent.parent
     PDF_STORAGE_DIR: str = "data/pdfs/uploads"
     VECTOR_DB_DIR: str = "data/vectors"
-    DATABASE_URL: str = "sqlite:///./data/api.db"
+    DATABASE_URL: str = Field(..., description="PostgreSQL connection URL (required via .env)")
     OLLAMA_HOST: str = "http://localhost:11434"
     EMBEDDING_MODEL: str = "nomic-embed-text"
     DEFAULT_CHAT_MODEL: str = "llama3.2"
 
-    class Config:
-        """Pydantic config."""
 
-        env_file = ".env"
-
-
-settings = Settings()
+settings = Settings()  # pyright: ignore[reportCallIssue]

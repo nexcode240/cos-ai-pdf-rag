@@ -1,19 +1,10 @@
 """Database models and session management."""
-from pathlib import Path
-
 from sqlalchemy import Boolean, Column, DateTime, Integer, JSON, String, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_DIR = Path("data")
-DATABASE_DIR.mkdir(parents=True, exist_ok=True)
-DATABASE_URL = f"sqlite:///{DATABASE_DIR}/api.db"
+from .config import settings
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    echo=False,
-)
-
+engine = create_engine(settings.DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
