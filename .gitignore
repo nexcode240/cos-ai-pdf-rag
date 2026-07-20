@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+.env
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+
+# Project specific
+data/vectors/
+data/pdfs/uploads/
+data/*.db
+*.log
+.cache
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
