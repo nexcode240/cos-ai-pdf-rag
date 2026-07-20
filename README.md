@@ -7,7 +7,7 @@ A FastAPI learning clone of [ollama_pdf_rag](../ollama_pdf_rag). Same RAG pipeli
 | This project | Original (`ollama_pdf_rag`) |
 |---|---|
 | `src/core/` | Shared RAG primitives (load, chunk, embed, LLM, pipeline) |
-| `src/api/` | FastAPI routers, services, SQLite metadata |
+| `src/api/` | FastAPI routers, services, PostgreSQL metadata |
 | No `web-ui/` | Skip Next.js — call the API via Swagger or curl |
 | No Streamlit | One backend path only |
 
@@ -29,7 +29,7 @@ VectorStore (Chroma)       ChatOllama answer + sources
   nomic-embed-text           (+ optional thinking models)
     │
     ▼
-SQLite pdfs table
+PostgreSQL pdfs table
 ```
 
 Read files in this order while learning:
@@ -46,7 +46,8 @@ See [LEARNING.md](LEARNING.md) for a guided walkthrough.
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.10–3.12
+- [PostgreSQL](https://www.postgresql.org/) running locally
 - [Ollama](https://ollama.com) running locally
 - Models:
 
@@ -59,21 +60,16 @@ ollama pull nomic-embed-text
 
 ```bash
 cd cosmos_ai_pdf_rag
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-# macOS / Linux
-source venv/bin/activate
-
-pip install -r requirements.txt
-cp .env.example .env
+uv sync
+cp .env.example .env   # set DATABASE_URL (required)
+createdb cosmos_ai_pdf_rag
+uv run alembic upgrade head
 ```
 
 ## Run
 
 ```bash
-python run_api.py
+uv run python run_api.py
 ```
 
 - API: http://localhost:8001
@@ -106,4 +102,4 @@ curl -X POST http://localhost:8001/api/v1/query \
 | Embedding model | `nomic-embed-text` |
 | Default chat model | `llama3.2` |
 | Vector store | Chroma under `data/vectors` |
-| Metadata DB | SQLite `data/api.db` |
+| Metadata DB | PostgreSQL (`DATABASE_URL` in `.env`) |
