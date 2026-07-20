@@ -45,6 +45,3 @@ class ChatMessage(Base):
     content = Column(String, nullable=False)
     sources = Column(JSON)
     timestamp = Column(DateTime, nullable=False)
-
-
-Base.metadata.create_all(bind=engine)

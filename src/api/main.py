@@ -5,10 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .database import Base, engine
 from .routers import health, models, pdfs, query
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Cosmos AI PDF RAG API",
