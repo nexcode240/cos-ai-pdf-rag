@@ -2,14 +2,16 @@
 
 A FastAPI learning clone of [ollama_pdf_rag](../ollama_pdf_rag). Same RAG pipeline and API shape, stripped down so you can study how PDF upload → chunk → embed → query works.
 
+![Gradio UI](gradio_ui.png)
+
 ## What this mirrors
 
 | This project | Original (`ollama_pdf_rag`) |
 |---|---|
 | `src/core/` | Shared RAG primitives (load, chunk, embed, LLM, pipeline) |
 | `src/api/` | FastAPI routers, services, PostgreSQL metadata |
-| No `web-ui/` | Skip Next.js — call the API via Swagger or curl |
-| No Streamlit | One backend path only |
+| `src/api/ui.py` | Gradio UI mounted on the FastAPI application |
+| No separate frontend | One Python backend process |
 
 ## Architecture (study path)
 
@@ -73,7 +75,11 @@ uv run python run_api.py
 ```
 
 - API: http://localhost:8001
+- Gradio UI: http://localhost:8001/ui
 - Swagger: http://localhost:8001/docs
+
+The root URL redirects to the Gradio UI. Use its **Documents** tab to upload
+and index PDFs, then use **Chat** to select documents and ask questions.
 
 ## Quick try
 
