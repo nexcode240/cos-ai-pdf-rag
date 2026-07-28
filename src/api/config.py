@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     OLLAMA_HOST: str = "http://localhost:11434"
     EMBEDDING_MODEL: str = "nomic-embed-text"
     DEFAULT_CHAT_MODEL: str = "llama3.2"
+    LANGSMITH_TRACING: bool = False
+    LANGSMITH_API_KEY: str = ""
+    LANGSMITH_PROJECT: str = "cosmos-ai-pdf-rag"
+    LANGSMITH_ENDPOINT: str = "https://api.smith.langchain.com"
 
 
 settings = Settings()  # pyright: ignore[reportCallIssue]

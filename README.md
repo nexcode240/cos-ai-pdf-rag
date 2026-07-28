@@ -68,6 +68,16 @@ createdb cosmos_ai_pdf_rag
 uv run alembic upgrade head
 ```
 
+Optional LangSmith debugging for the RAG graph — add to `.env`:
+
+```bash
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv2_pt_...
+LANGSMITH_PROJECT=cosmos-ai-pdf-rag
+```
+
+Then open [smith.langchain.com](https://smith.langchain.com) and inspect each `pdf_rag_graph` run (analyze → retrieve → grade → answer).
+
 ## Run
 
 ```bash

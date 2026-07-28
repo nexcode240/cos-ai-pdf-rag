@@ -2,6 +2,7 @@
 from datetime import datetime
 from typing import Optional, cast
 
+from langchain_core.runnables import RunnableConfig
 from sqlalchemy.orm import Session
 
 from ..database import ChatMessage, ChatSession, PDFMetadata
@@ -51,7 +52,20 @@ class RAGService:
                 f"Using model: {model}",
             ],
         }
-        result = rag_graph.invoke(initial_state)
+        result = rag_graph.invoke(
+            initial_state,
+            config=RunnableConfig(
+                run_name="pdf_rag_graph",
+                tags=["rag", "langgraph", "pdf"],
+                metadata={
+                    "model": model,
+                    "pdf_count": len(pdf_payload),
+                    "pdf_ids": [pdf["pdf_id"] for pdf in pdf_payload],
+                    "pdf_names": [pdf["name"] for pdf in pdf_payload],
+                    "question_preview": question[:120],
+                },
+            ),
+        )
         return (
             result.get("answer") or "",
             result.get("sources") or [],

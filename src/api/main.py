@@ -7,7 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 from .routers import health, models, pdfs, query
+from .tracing import configure_langsmith
 from .ui import create_ui
+
+configure_langsmith()
 
 app = FastAPI(
     title="Cosmos AI PDF RAG API",

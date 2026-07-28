@@ -251,7 +251,7 @@ def build_rag_graph():
     )
     graph.add_edge("generate_answer", END)
     graph.add_edge("insufficient_information", END)
-    return graph.compile()
+    return graph.compile(name="pdf_rag_graph")
 
 
 rag_graph = build_rag_graph()
