@@ -255,3 +255,6 @@ def build_rag_graph():
 
 
 rag_graph = build_rag_graph()
+
+# LangGraph / LangSmith Studio entrypoint (`langgraph.json` → pdf_rag).
+graph = rag_graph

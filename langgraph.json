@@ -1,0 +1,9 @@
+{
+  "$schema": "https://langgra.ph/schema.json",
+  "python_version": "3.12",
+  "dependencies": ["."],
+  "graphs": {
+    "pdf_rag": "src.api.services.rag_graph:graph"
+  },
+  "env": ".env"
+}

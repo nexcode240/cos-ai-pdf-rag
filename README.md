@@ -48,7 +48,7 @@ See [LEARNING.md](LEARNING.md) for a guided walkthrough.
 
 ## Prerequisites
 
-- Python 3.10–3.12
+- Python 3.11–3.12
 - [PostgreSQL](https://www.postgresql.org/) running locally
 - [Ollama](https://ollama.com) running locally
 - Models:
@@ -68,15 +68,46 @@ createdb cosmos_ai_pdf_rag
 uv run alembic upgrade head
 ```
 
-Optional LangSmith debugging for the RAG graph — add to `.env`:
+Optional LangSmith Studio for the RAG graph — add to `.env`:
 
 ```bash
-LANGSMITH_TRACING=true
 LANGSMITH_API_KEY=lsv2_pt_...
 LANGSMITH_PROJECT=cosmos-ai-pdf-rag
+LANGSMITH_TRACING=true
 ```
 
-Then open [smith.langchain.com](https://smith.langchain.com) and inspect each `pdf_rag_graph` run (analyze → retrieve → grade → answer).
+Then start Studio against this project:
+
+```bash
+uv sync --group dev
+uv run langgraph dev
+```
+
+Open the Studio URL printed in the terminal (typically
+`https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`).
+You will see the `pdf_rag` graph diagram and can run / step through it.
+
+Example Studio input:
+
+```json
+{
+  "question": "What is this document about?",
+  "model": "llama3.2",
+  "pdfs": [
+    {
+      "pdf_id": "pdf_123",
+      "name": "example.pdf",
+      "collection_name": "pdf_..."
+    }
+  ],
+  "search_queries": [],
+  "documents": [],
+  "documents_relevant": false,
+  "answer": "",
+  "sources": [],
+  "reasoning_steps": []
+}
+```
 
 ## Run
 
