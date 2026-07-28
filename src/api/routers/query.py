@@ -1,6 +1,7 @@
 """RAG query endpoints."""
 import logging
 import uuid
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -65,15 +66,23 @@ def query_pdfs(
 
     return QueryResponse(
         answer=answer,
-        sources=[SourceInfo(**s) for s in sources],
+        sources=[
+            SourceInfo(
+                pdf_name=str(s.get("pdf_name") or "Unknown"),
+                pdf_id=str(s.get("pdf_id") or ""),
+                chunk_index=int(s.get("chunk_index") or 0),
+            )
+            for s in sources
+        ],
         metadata={
             "model_used": request.model,
             "chunks_retrieved": len(sources),
-            "pdfs_queried": len({s["pdf_id"] for s in sources}),
+            "pdfs_queried": len({str(s.get("pdf_id")) for s in sources}) if sources else 0,
             "reasoning_steps": reasoning_steps,
+            "flow": "langgraph_rag",
         },
         session_id=session_id,
-        message_id=message.message_id,
+        message_id=cast(int, cast(object, message.message_id)),
     )
 
 
