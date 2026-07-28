@@ -15,9 +15,66 @@ from .models import (
 )
 
 
-def _api_client() -> httpx.AsyncClient:
+async def _document_data() -> tuple[str, list[tuple[str, str]]]:
+    """Fetch library HTML and selector choices from the PDFs API."""
+    async with _api_client(timeout=30) as client:
+        response = await client.get("/api/v1/pdfs")
+    response.raise_for_status()
+    pdfs = [PDFListItem.model_validate(item) for item in response.json()]
+    return _format_library_html(pdfs), [
+        (pdf.name, pdf.pdf_id) for pdf in pdfs
+    ]
+
+
+def _escape_html(text: str) -> str:
+    """Escape text for safe HTML table rendering."""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _format_library_html(pdfs: list[PDFListItem]) -> str:
+    """Render PDF list API results as a full-width HTML table."""
+    if not pdfs:
+        return (
+            '<p style="opacity:0.7;margin:0.5rem 0">'
+            "No documents uploaded yet."
+            "</p>"
+        )
+
+    cell = "padding:0.55rem 0.75rem;border-bottom:1px solid rgba(255,255,255,0.12)"
+    header = (
+        f'<th style="text-align:left;{cell};opacity:0.8;font-weight:600">Name</th>'
+        f'<th style="text-align:right;{cell};opacity:0.8;font-weight:600;width:5.5rem">Pages</th>'
+        f'<th style="text-align:right;{cell};opacity:0.8;font-weight:600;width:5.5rem">Chunks</th>'
+        f'<th style="text-align:left;{cell};opacity:0.8;font-weight:600;width:9rem">Uploaded</th>'
+    )
+    rows: list[str] = []
+    for pdf in pdfs:
+        uploaded = pdf.upload_timestamp.strftime("%Y-%m-%d %H:%M")
+        rows.append(
+            "<tr>"
+            f'<td style="{cell}">{_escape_html(pdf.name)}</td>'
+            f'<td style="text-align:right;{cell}">{pdf.page_count}</td>'
+            f'<td style="text-align:right;{cell}">{pdf.doc_count}</td>'
+            f'<td style="{cell}">{uploaded}</td>'
+            "</tr>"
+        )
+    return (
+        '<div style="width:100%;overflow-x:auto">'
+        '<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
+        f"<thead><tr>{header}</tr></thead>"
+        f'<tbody>{"".join(rows)}</tbody>'
+        "</table></div>"
+    )
+
+
+def _api_client(timeout: float = 600) -> httpx.AsyncClient:
     """Create a client for the application's REST API."""
-    return httpx.AsyncClient(base_url=settings.API_BASE_URL, timeout=600)
+    return httpx.AsyncClient(base_url=settings.API_BASE_URL, timeout=timeout)
 
 
 def _error_detail(response: httpx.Response) -> str:
@@ -31,30 +88,9 @@ def _error_detail(response: httpx.Response) -> str:
     return response.text or f"HTTP {response.status_code}"
 
 
-async def _document_data() -> tuple[
-    list[list[str | int]], list[tuple[str, str]]
-]:
-    """Fetch document rows and selector choices from the PDFs API."""
-    async with _api_client() as client:
-        response = await client.get("/api/v1/pdfs")
-    response.raise_for_status()
-    pdfs = [PDFListItem.model_validate(item) for item in response.json()]
-    rows = [
-        [
-            pdf.name,
-            pdf.page_count,
-            pdf.doc_count,
-            pdf.upload_timestamp.strftime("%Y-%m-%d %H:%M"),
-        ]
-        for pdf in pdfs
-    ]
-    choices = [(pdf.name, pdf.pdf_id) for pdf in pdfs]
-    return rows, choices
-
-
 async def _model_choices() -> list[str]:
     """Fetch installed chat models from the models API."""
-    async with _api_client() as client:
+    async with _api_client(timeout=30) as client:
         response = await client.get("/api/v1/models")
     if response.is_error:
         return [settings.DEFAULT_CHAT_MODEL]
@@ -65,9 +101,9 @@ async def _model_choices() -> list[str]:
 async def _refresh_ui() -> tuple[object, object, object]:
     """Refresh documents and models through the REST API."""
     try:
-        rows, choices = await _document_data()
+        library, choices = await _document_data()
     except (httpx.HTTPError, ValueError):
-        rows, choices = [], []
+        library, choices = _format_library_html([]), []
 
     models = await _model_choices()
     selected_model = (
@@ -76,7 +112,7 @@ async def _refresh_ui() -> tuple[object, object, object]:
         else models[0]
     )
     return (
-        gr.update(value=rows),
+        gr.update(value=library),
         gr.update(choices=choices, value=[]),
         gr.update(choices=models, value=selected_model),
     )
@@ -85,22 +121,31 @@ async def _refresh_ui() -> tuple[object, object, object]:
 async def _refresh_library() -> tuple[object, object]:
     """Refresh documents through the REST API."""
     try:
-        rows, choices = await _document_data()
-        return gr.update(value=rows), gr.update(choices=choices, value=[])
-    except (httpx.HTTPError, ValueError):
-        return gr.update(value=[]), gr.update(choices=[], value=[])
+        library, choices = await _document_data()
+        return gr.update(value=library), gr.update(choices=choices, value=[])
+    except (httpx.HTTPError, ValueError) as exc:
+        return (
+            gr.update(
+                value=(
+                    '<p style="opacity:0.7;margin:0.5rem 0">'
+                    f"Failed to load documents: {_escape_html(str(exc))}"
+                    "</p>"
+                )
+            ),
+            gr.update(choices=[], value=[]),
+        )
 
 
 async def _upload_pdf(file_path: str | None) -> tuple[str, object, object]:
     """Upload a PDF through POST /api/v1/pdfs/upload."""
     if not file_path:
-        table, selector = await _refresh_library()
-        return "Select a PDF first.", table, selector
+        library, selector = await _refresh_library()
+        return "Select a PDF first.", library, selector
 
     path = Path(file_path)
     if path.suffix.lower() != ".pdf":
-        table, selector = await _refresh_library()
-        return "Only PDF files are supported.", table, selector
+        library, selector = await _refresh_library()
+        return "Only PDF files are supported.", library, selector
 
     try:
         with path.open("rb") as file_handle:
@@ -113,19 +158,19 @@ async def _upload_pdf(file_path: str | None) -> tuple[str, object, object]:
             raise RuntimeError(_error_detail(response))
 
         uploaded = PDFUploadResponse.model_validate(response.json())
-        rows, choices = await _document_data()
+        library, choices = await _document_data()
         status = (
             f"Uploaded **{uploaded.name}** "
             f"({uploaded.page_count} pages, {uploaded.doc_count} chunks)."
         )
         return (
             status,
-            gr.update(value=rows),
+            gr.update(value=library),
             gr.update(choices=choices, value=[uploaded.pdf_id]),
         )
     except (httpx.HTTPError, OSError, RuntimeError, ValueError) as exc:
-        table, selector = await _refresh_library()
-        return f"Upload failed: {exc}", table, selector
+        library, selector = await _refresh_library()
+        return f"Upload failed: {exc}", library, selector
 
 
 async def _delete_pdfs(
@@ -134,8 +179,8 @@ async def _delete_pdfs(
     """Delete selected PDFs through DELETE /api/v1/pdfs/{pdf_id}."""
     pdf_ids = list(pdf_ids or [])
     if not pdf_ids:
-        table, selector = await _refresh_library()
-        return "Select at least one PDF to remove.", table, selector
+        library, selector = await _refresh_library()
+        return "Select at least one PDF to remove.", library, selector
 
     deleted: list[str] = []
     errors: list[str] = []
@@ -148,10 +193,10 @@ async def _delete_pdfs(
                 else:
                     deleted.append(pdf_id)
     except httpx.HTTPError as exc:
-        table, selector = await _refresh_library()
-        return f"Delete failed: {exc}", table, selector
+        library, selector = await _refresh_library()
+        return f"Delete failed: {exc}", library, selector
 
-    table, selector = await _refresh_library()
+    library, selector = await _refresh_library()
     if deleted and not errors:
         count = len(deleted)
         status = f"Removed {count} PDF{'s' if count != 1 else ''}."
@@ -162,7 +207,7 @@ async def _delete_pdfs(
         )
     else:
         status = f"Delete failed: {'; '.join(errors)}"
-    return status, table, selector
+    return status, library, selector
 
 
 async def _chat(
@@ -269,30 +314,45 @@ def create_ui() -> gr.Blocks:
             )
             upload_button = gr.Button("Upload and index", variant="primary")
             upload_status = gr.Markdown()
-            document_table = gr.Dataframe(
-                headers=["Name", "Pages", "Chunks", "Uploaded"],
-                datatype=["str", "number", "number", "str"],
-                interactive=False,
-                label="Document library",
+            with gr.Row(equal_height=True):
+                gr.Markdown("### Document library")
+                library_refresh_button = gr.Button(
+                    "Refresh library",
+                    scale=0,
+                    min_width=140,
+                )
+            document_library = gr.HTML(
+                value="<p style='opacity:0.7'>Loading documents...</p>",
+                container=True,
+                padding=False,
             )
 
+        library_outputs = [document_library, pdf_selector]
         demo.load(
             _refresh_ui,
-            outputs=[document_table, pdf_selector, model],
+            outputs=[*library_outputs, model],
+            show_progress="hidden",
         )
         refresh_button.click(
             _refresh_library,
-            outputs=[document_table, pdf_selector],
+            outputs=library_outputs,
+            show_progress="hidden",
+        )
+        library_refresh_button.click(
+            _refresh_library,
+            outputs=library_outputs,
+            show_progress="hidden",
         )
         upload_button.click(
             _upload_pdf,
             inputs=[file_input],
-            outputs=[upload_status, document_table, pdf_selector],
+            outputs=[upload_status, *library_outputs],
         )
         delete_button.click(
             _delete_pdfs,
             inputs=[pdf_selector],
-            outputs=[delete_status, document_table, pdf_selector],
+            outputs=[delete_status, *library_outputs],
+            show_progress="hidden",
         )
 
         chat_inputs = [question, chatbot, model, pdf_selector, session_id]
