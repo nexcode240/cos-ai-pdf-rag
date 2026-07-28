@@ -128,6 +128,43 @@ async def _upload_pdf(file_path: str | None) -> tuple[str, object, object]:
         return f"Upload failed: {exc}", table, selector
 
 
+async def _delete_pdfs(
+    pdf_ids: list[str] | None,
+) -> tuple[str, object, object]:
+    """Delete selected PDFs through DELETE /api/v1/pdfs/{pdf_id}."""
+    pdf_ids = list(pdf_ids or [])
+    if not pdf_ids:
+        table, selector = await _refresh_library()
+        return "Select at least one PDF to remove.", table, selector
+
+    deleted: list[str] = []
+    errors: list[str] = []
+    try:
+        async with _api_client() as client:
+            for pdf_id in pdf_ids:
+                response = await client.delete(f"/api/v1/pdfs/{pdf_id}")
+                if response.is_error:
+                    errors.append(f"{pdf_id}: {_error_detail(response)}")
+                else:
+                    deleted.append(pdf_id)
+    except httpx.HTTPError as exc:
+        table, selector = await _refresh_library()
+        return f"Delete failed: {exc}", table, selector
+
+    table, selector = await _refresh_library()
+    if deleted and not errors:
+        count = len(deleted)
+        status = f"Removed {count} PDF{'s' if count != 1 else ''}."
+    elif deleted and errors:
+        status = (
+            f"Removed {len(deleted)} PDF(s). "
+            f"Failed: {'; '.join(errors)}"
+        )
+    else:
+        status = f"Delete failed: {'; '.join(errors)}"
+    return status, table, selector
+
+
 async def _chat(
     question: str,
     history: list[dict[str, str]] | None,
@@ -201,7 +238,13 @@ def create_ui() -> gr.Blocks:
                         info="Leave empty to search all uploaded PDFs.",
                         show_select_all=True,
                     )
-                    refresh_button = gr.Button("Refresh documents")
+                    with gr.Row():
+                        refresh_button = gr.Button("Refresh")
+                        delete_button = gr.Button(
+                            "Remove selected",
+                            variant="stop",
+                        )
+                    delete_status = gr.Markdown()
                 with gr.Column(scale=3):
                     chatbot = gr.Chatbot(
                         label="PDF assistant",
@@ -245,6 +288,11 @@ def create_ui() -> gr.Blocks:
             _upload_pdf,
             inputs=[file_input],
             outputs=[upload_status, document_table, pdf_selector],
+        )
+        delete_button.click(
+            _delete_pdfs,
+            inputs=[pdf_selector],
+            outputs=[delete_status, document_table, pdf_selector],
         )
 
         chat_inputs = [question, chatbot, model, pdf_selector, session_id]
